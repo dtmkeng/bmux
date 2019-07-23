@@ -15,10 +15,11 @@ type student struct {
 
 func main() {
 	r := bmux.NewRouter()
+	r.HandleFunc("/", home)
 	fmt.Println("Server start at 8000...")
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
 
-// func home(w http.ResponseWriter, r *http.Request) {
-// 	fmt.Fprintf(w, "Hello World")
-// }
+func home(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Hello World")
+}

@@ -2,6 +2,7 @@ package bmux
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"path"
 )
@@ -163,6 +164,53 @@ func cleanPath(p string) string {
 	}
 
 	return np
+}
+
+// uniqueVars returns an error if two slices contain duplicated strings.
+func uniqueVars(s1, s2 []string) error {
+	for _, v1 := range s1 {
+		for _, v2 := range s2 {
+			if v1 == v2 {
+				return fmt.Errorf("mux: duplicated route variable %q", v2)
+			}
+		}
+	}
+	return nil
+}
+func copyRouteRegexp(r *routeRegexp) *routeRegexp {
+	c := *r
+	return &c
+}
+
+// returns an effective deep copy of `routeConf`
+func copyRouteConf(r routeConf) routeConf {
+	c := r
+
+	if r.regexp.path != nil {
+		c.regexp.path = copyRouteRegexp(r.regexp.path)
+	}
+
+	if r.regexp.host != nil {
+		c.regexp.host = copyRouteRegexp(r.regexp.host)
+	}
+
+	c.regexp.queries = make([]*routeRegexp, 0, len(r.regexp.queries))
+	for _, q := range r.regexp.queries {
+		c.regexp.queries = append(c.regexp.queries, copyRouteRegexp(q))
+	}
+
+	c.matchers = make([]matcher, len(r.matchers))
+	copy(c.matchers, r.matchers)
+
+	return c
+}
+
+// NewRoute registers an empty route.
+func (r *Router) NewRoute() *Route {
+	// initialize a route with a copy of the parent router's configuration
+	route := &Route{routeConf: copyRouteConf(r.routeConf), namedRoutes: r.namedRoutes}
+	r.routes = append(r.routes, route)
+	return route
 }
 
 // Match attempts to match the given request against the router's registered routes.

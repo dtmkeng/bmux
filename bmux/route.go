@@ -1,7 +1,9 @@
 package bmux
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 type matcher interface {
@@ -97,6 +99,110 @@ func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
 
 func (m methodMatcher) Match(r *http.Request, match *RouteMatch) bool {
 	return matchInArray(m, r.Method)
+}
+
+// HandleFunc registers a new route with a matcher for the URL path.
+// See Route.Path() and Route.HandlerFunc().
+func (r *Router) HandleFunc(path string, f func(http.ResponseWriter,
+	*http.Request)) *Route {
+	return r.NewRoute().Path(path).HandlerFunc(f)
+}
+
+// HandlerFunc sets a handler function for the route.
+func (r *Route) HandlerFunc(f func(http.ResponseWriter, *http.Request)) *Route {
+	return r.Handler(http.HandlerFunc(f))
+}
+
+// Handler --------------------------------------------------------------------
+
+// Handler sets a handler for the route.
+func (r *Route) Handler(handler http.Handler) *Route {
+	if r.err == nil {
+		r.handler = handler
+	}
+	return r
+}
+
+// Path -----------------------------------------------------------------------
+
+// Path adds a matcher for the URL path.
+// It accepts a template with zero or more URL variables enclosed by {}. The
+// template must start with a "/".
+// Variables can define an optional regexp pattern to be matched:
+//
+// - {name} matches anything until the next slash.
+//
+// - {name:pattern} matches the given regexp pattern.
+//
+// For example:
+//
+//     r := mux.NewRouter()
+//     r.Path("/products/").Handler(ProductsHandler)
+//     r.Path("/products/{key}").Handler(ProductsHandler)
+//     r.Path("/articles/{category}/{id:[0-9]+}").
+//       Handler(ArticleHandler)
+//
+// Variable names must be unique in a given route. They can be retrieved
+// calling mux.Vars(request).
+func (r *Route) Path(tpl string) *Route {
+	r.err = r.addRegexpMatcher(tpl, regexpTypePath)
+	return r
+}
+
+// addRegexpMatcher adds a host or path matcher and builder to a route.
+func (r *Route) addRegexpMatcher(tpl string, typ regexpType) error {
+	if r.err != nil {
+		return r.err
+	}
+	if typ == regexpTypePath || typ == regexpTypePrefix {
+		if len(tpl) > 0 && tpl[0] != '/' {
+			return fmt.Errorf("mux: path must start with a slash, got %q", tpl)
+		}
+		if r.regexp.path != nil {
+			tpl = strings.TrimRight(r.regexp.path.template, "/") + tpl
+		}
+	}
+	rr, err := newRouteRegexp(tpl, typ, routeRegexpOptions{
+		strictSlash:    r.strictSlash,
+		useEncodedPath: r.useEncodedPath,
+	})
+	if err != nil {
+		return err
+	}
+	for _, q := range r.regexp.queries {
+		if err = uniqueVars(rr.varsN, q.varsN); err != nil {
+			return err
+		}
+	}
+	if typ == regexpTypeHost {
+		if r.regexp.path != nil {
+			if err = uniqueVars(rr.varsN, r.regexp.path.varsN); err != nil {
+				return err
+			}
+		}
+		r.regexp.host = rr
+	} else {
+		if r.regexp.host != nil {
+			if err = uniqueVars(rr.varsN, r.regexp.host.varsN); err != nil {
+				return err
+			}
+		}
+		if typ == regexpTypeQuery {
+			r.regexp.queries = append(r.regexp.queries, rr)
+		} else {
+			r.regexp.path = rr
+		}
+	}
+	// r.addMatcher(rr)
+	return nil
+}
+
+// addMatcher adds a matcher to the route.
+func (r *Route) addMatcher(m matcher) *Route {
+	if r.err == nil {
+		r.matchers = append(r.matchers, m)
+	}
+	return r
 }
 
 // matchInArray returns true if the given string value is in the array.
