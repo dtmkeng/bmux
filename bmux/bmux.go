@@ -2,6 +2,7 @@ package bmux
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"path"
 )
@@ -18,8 +19,9 @@ var (
 type RouteMatch struct {
 	Route   *Route
 	Handler http.Handler
-	Vars    map[string]string
-
+	// *Application
+	Vars map[string]string
+	// aero.Application
 	// MatchErr is set to appropriate matching error
 	// It is set to ErrMethodMismatch if there is a mismatch in
 	// the request method and route method
@@ -31,14 +33,13 @@ func NewRouter() *Router {
 	return &Router{namedRoutes: make(map[string]*Route)}
 }
 
-// Router bmxu
+// Router ...
 type Router struct {
 	// Configurable Handler to be used when no route matches.
 	NotFoundHandler http.Handler
-
 	// Configurable Handler to be used when the request method does not match the route.
 	MethodNotAllowedHandler http.Handler
-
+	*Application
 	// Routes to be matched, in order.
 	routes []*Route
 
@@ -56,6 +57,16 @@ type Router struct {
 
 	// configuration shared with `Route`
 	routeConf
+
+	get     tree
+	post    tree
+	delete  tree
+	put     tree
+	patch   tree
+	head    tree
+	connect tree
+	trace   tree
+	options tree
 }
 type routeConf struct {
 	// If true, "/path/foo%2Fbar/to" will match the path "/path/{var}/to"
@@ -88,6 +99,7 @@ const (
 )
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// contexts.handler = tree.data
 	if !r.skipClean {
 		path := req.URL.Path
 		if r.useEncodedPath {
@@ -110,6 +122,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	var match RouteMatch
 	var handler http.Handler
+	fmt.Println(handler)
 	if r.Match(req, &match) {
 		handler = match.Handler
 		req = setVars(req, match.Vars)
@@ -126,6 +139,38 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	handler.ServeHTTP(w, req)
 }
+
+// ServeHTTP responds to the given request.
+type RewriteContext interface {
+	Path() string
+	SetPath(string)
+}
+
+// func (app *Application) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+// 	ctx := app.NewContext(request, response)
+
+// 	for _, rewrite := range app.rewrite {
+// 		rewrite(ctx)
+// 	}
+
+// 	app.router.Lookup(request.Method, request.URL.Path, ctx)
+
+// 	if ctx.handler == nil {
+// 		response.WriteHeader(http.StatusNotFound)
+// 		ctx.Close()
+// 		return
+// 	}
+
+// 	err := ctx.handler(ctx)
+
+// 	if err != nil {
+// 		for _, callback := range app.onError {
+// 			callback(ctx, err)
+// 		}
+// 	}
+
+// 	ctx.Close()
+// }
 func setVars(r *http.Request, val interface{}) *http.Request {
 	return contextSet(r, varsKey, val)
 }
@@ -212,3 +257,13 @@ func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 func methodNotAllowedHandler() http.Handler { return http.HandlerFunc(methodNotAllowed) }
+
+// // Get registers your function to be called when the given GET path has been requested.
+// func (r Router) Get(path string, handler Handler) {
+// 	// app.routes.GET = append(app.routes.GET, path)
+// 	// app.router.Add(http.MethodGet, path, handler)
+// 	// return nil
+// }
+
+// Get registers your function to be called when the given GET path has been requested.
+// Get registers your function to be called when the given GET path has been requested.

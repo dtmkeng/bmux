@@ -1,6 +1,7 @@
 package bmux
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -23,7 +24,7 @@ type Route struct {
 	err error
 
 	// "global" reference to all named routes
-	namedRoutes map[string]*Route
+	// namedRoutes map[string]*Route
 
 	// config possibly passed in from `Router`
 	routeConf
@@ -107,4 +108,55 @@ func matchInArray(arr []string, value string) bool {
 		}
 	}
 	return false
+}
+
+// Lookup finds the handler and parameters for the given route
+// and assigns them to the given context.
+func (router *Router) Lookup(method string, path string, ctx *contexts) {
+	tree := router.selectTree(method)
+
+	// Fast path for the root node
+	if tree.prefix == path {
+		ctx.handler = tree.data
+		return
+	}
+
+	tree.find(path, ctx)
+}
+
+// Add registers a new handler for the given method and path.
+func (router *Router) Add(method string, path string, handler Handler) {
+	tree := router.selectTree(method)
+
+	if tree == nil {
+		panic(fmt.Errorf("Unknown HTTP method: '%s'", method))
+	}
+
+	tree.add(path, handler)
+}
+
+// selectTree returns the tree by the given HTTP method.
+func (router *Router) selectTree(method string) *tree {
+	switch method {
+	case http.MethodGet:
+		return &router.get
+	case http.MethodPost:
+		return &router.post
+	case http.MethodDelete:
+		return &router.delete
+	case http.MethodPut:
+		return &router.put
+	case http.MethodPatch:
+		return &router.patch
+	case http.MethodHead:
+		return &router.head
+	case http.MethodConnect:
+		return &router.connect
+	case http.MethodTrace:
+		return &router.trace
+	case http.MethodOptions:
+		return &router.options
+	default:
+		return nil
+	}
 }
