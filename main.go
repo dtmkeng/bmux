@@ -1,10 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net/http"
-
 	"github.com/dtmkeng/bmux/bmux"
 )
 
@@ -15,9 +11,13 @@ type student struct {
 
 func main() {
 	r := bmux.NewRouter()
-	fmt.Println("Server start at 8000...")
+	// fmt.Println("Server start at 8000...")
 	// a := mux.NewRouter()
-	log.Fatal(http.ListenAndServe(":8000", r))
+	r.Get("/", func(ctx bmux.Context) error {
+		return ctx.String("hello")
+	})
+	r.Run()
+	// log.Fatal(http.ListenAndServe(":8000", r))
 
 	// r := bmux
 }

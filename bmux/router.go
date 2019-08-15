@@ -54,3 +54,14 @@ func (router *Routers) Add(method string, path string, handler Handler) {
 
 	tree.add(path, handler)
 }
+func (router *Routers) Lookup(method string, path string, ctx *context) {
+	tree := router.selectTree(method)
+
+	// Fast path for the root node
+	if tree.prefix == path {
+		ctx.handler = tree.data
+		return
+	}
+
+	tree.find(path, ctx)
+}
