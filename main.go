@@ -1,6 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+
 	"github.com/dtmkeng/bmux/bmux"
 )
 
@@ -9,6 +14,8 @@ type student struct {
 	Age  int
 }
 
+var port = 8080
+
 func main() {
 	r := bmux.NewRouter()
 	// fmt.Println("Server start at 8000...")
@@ -16,8 +23,10 @@ func main() {
 	r.Get("/", func(ctx bmux.Context) error {
 		return ctx.String("hello")
 	})
-	r.Run()
-	// log.Fatal(http.ListenAndServe(":8000", r))
+	// r.Run() http serer
+	fmt.Println("Server start at ... ", port)
+	// color.GreedString()
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), r)) // defaut Listener and serve
 
 	// r := bmux
 }

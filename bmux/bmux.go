@@ -216,7 +216,7 @@ const (
 // 	handler.ServeHTTP(w, req)
 // }
 
-// NewContext returns a new context from the pool.
+// NewContext ...
 func (app *Application) NewContext(req *http.Request, res http.ResponseWriter) *context {
 	ctx := app.contextPool.Get().(*context)
 	ctx.status = http.StatusOK
