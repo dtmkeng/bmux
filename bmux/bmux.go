@@ -2,8 +2,12 @@ package bmux
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"path"
+	"sync"
+	"time"
 )
 
 var (
@@ -26,10 +30,87 @@ type RouteMatch struct {
 	MatchErr error
 }
 
-// NewRouter returns a new router instance.
-func NewRouter() *Router {
-	return &Router{namedRoutes: make(map[string]*Route)}
+// Application represents a single web service.
+type Application struct {
+	// Config                *Configuration
+	// Sessions              session.Manager
+	// Security              ApplicationSecurity
+	// Linters               []Linter
+	// ContentSecurityPolicy *csp.ContentSecurityPolicy
+
+	router     Routers
+	routeTests map[string][]string
+	start      time.Time
+	// rewrite        []func(RewriteContext)
+	// middleware     []Middleware
+	// pushConditions []func(Context) bool
+	onStart    []func()
+	onShutdown []func()
+	// onPush         []func(Context)
+	// onError        []func(Context, error)
+	stop           chan os.Signal
+	pushOptions    http.PushOptions
+	contextPool    sync.Pool
+	gzipWriterPool sync.Pool
+	serversMutex   sync.Mutex
+	// servers        [2]*http.Server
+
+	routes struct {
+		GET []string
+	}
+	// Configurable Handler to be used when no route matches.
+	NotFoundHandler http.Handler
+
+	// Configurable Handler to be used when the request method does not match the route.
+	MethodNotAllowedHandler http.Handler
+
+	// Routes to be matched, in order.
+	// routes []*Route
+
+	// Routes by name for URL building.
+	namedRoutes map[string]*Route
+
+	// If true, do not clear the request context after handling the request.
+	//
+	// Deprecated: No effect when go1.7+ is used, since the context is stored
+	// on the request itself.
+	KeepContext bool
+
+	// Slice of middlewares to be called after a match is found
+	middlewares []middleware
+
+	// configuration shared with `Route`
+	routeConf
 }
+
+// NewRouter creates a new application.
+func NewRouter() *Application {
+	app := &Application{namedRoutes: make(map[string]*Route)}
+
+	// Default CSP
+	// Context pool
+	app.contextPool.New = func() interface{} {
+		return &context{
+			app: app,
+		}
+	}
+
+	// Push options describes the headers that are sent
+	// to our server to retrieve the push response.
+	app.pushOptions = http.PushOptions{
+		Method: "GET",
+		Header: http.Header{
+			acceptEncodingHeader: []string{"gzip"},
+		},
+	}
+
+	return app
+}
+
+// // NewRouter returns a new router instance.
+// func NewRouter() *Router {
+// 	return &Router{namedRoutes: make(map[string]*Route)}
+// }
 
 // Router bmxu
 type Router struct {
@@ -87,7 +168,7 @@ const (
 	routeKey
 )
 
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *Application) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !r.skipClean {
 		path := req.URL.Path
 		if r.useEncodedPath {
@@ -108,13 +189,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+	fmt.Println(req)
 	var match RouteMatch
 	var handler http.Handler
-	if r.Match(req, &match) {
-		handler = match.Handler
-		req = setVars(req, match.Vars)
-		req = setCurrentRoute(req, match.Route)
-	}
+	// if r.Match(req, &match) {
+	// 	handler = match.Handler
+	// 	req = setVars(req, match.Vars)
+	// 	req = setCurrentRoute(req, match.Route)
+	// }
 
 	if handler == nil && match.MatchErr == ErrMethodMismatch {
 		handler = methodNotAllowedHandler()
@@ -212,3 +294,10 @@ func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 func methodNotAllowedHandler() http.Handler { return http.HandlerFunc(methodNotAllowed) }
+
+// Get registers your function to be called when the given GET path has been requested.
+func (app *Application) Get(path string, handler Handler) {
+	app.routes.GET = append(app.routes.GET, path)
+	app.router.Add(http.MethodGet, path, handler)
+	// return
+}
