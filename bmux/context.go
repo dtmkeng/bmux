@@ -41,7 +41,7 @@ type Context interface {
 	Bytes([]byte) error
 	Close()
 	// CSS(string) error
-	// Get(string) string
+	Get(string) string
 	// GetInt(string) (int, error)
 	// Error(int, ...interface{}) error
 	// EventStream(stream *EventStream) error
@@ -58,8 +58,8 @@ type Context interface {
 	// ReadSeeker(io.ReadSeeker) error
 	// Redirect(status int, url string) error
 	// RemoteIP() string
-	// Request() Request
-	// Response() Response
+	Request() Request
+	Response() Response
 	// Session() *session.Session
 	// SetStatus(int)
 	// Status() int
@@ -94,6 +94,16 @@ func contextSet(r *http.Request, key, val interface{}) *http.Request {
 	return r.WithContext(stdcontext.WithValue(r.Context(), key, val))
 }
 
+// Response returns the HTTP response.
+func (ctx *context) Response() Response {
+	return &ctx.response
+}
+
+// Request returns the HTTP request.
+func (ctx *context) Request() Request {
+	return &ctx.request
+}
+
 // Close frees up resources and is automatically called
 // in the ServeHTTP part of the web server.
 func (ctx *context) Close() {
@@ -113,6 +123,17 @@ func (ctx *context) Path() string {
 // SetPath sets the relative request path, e.g. /blog/post/123.
 func (ctx *context) SetPath(path string) {
 	ctx.request.inner.URL.Path = path
+}
+
+// Get retrieves an URL parameter.
+func (ctx *context) Get(param string) string {
+	for i := 0; i < ctx.paramCount; i++ {
+		if ctx.paramNames[i] == param {
+			return ctx.paramValues[i]
+		}
+	}
+
+	return ""
 }
 
 // Bytes responds either with raw text or gzipped if the
