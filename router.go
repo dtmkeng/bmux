@@ -73,7 +73,7 @@ func loadAero(routes []route) http.Handler {
 		case "GET":
 			app.Get(r.path, h)
 		default:
-			panic("Unknow HTTP method: " + r.method)
+
 		}
 	}
 	return app
@@ -114,7 +114,7 @@ func loadBmux(routes []route) http.Handler {
 		case "GET":
 			app.Get(r.path, h)
 		default:
-			panic("Unknow HTTP method: " + r.method)
+			// panic("Unknow HTTP method: " + r.method)
 		}
 	}
 	return app
