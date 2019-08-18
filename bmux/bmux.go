@@ -44,7 +44,7 @@ type Application struct {
 	// Security              ApplicationSecurity
 	// Linters               []Linter
 	// ContentSecurityPolicy *csp.ContentSecurityPolicy
-
+	context
 	router     Routers
 	routeTests map[string][]string
 	start      time.Time
@@ -225,11 +225,13 @@ func (app *Application) NewContext(req *http.Request, res http.ResponseWriter) *
 	ctx.session = nil
 	ctx.paramCount = 0
 	ctx.modifierCount = 0
+	ctx.queryCache = nil
 	return ctx
 }
 
 // ServeHTTP responds to the given request.
 func (app *Application) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+
 	ctx := app.NewContext(request, response)
 
 	for _, rewrite := range app.rewrite {
@@ -237,7 +239,6 @@ func (app *Application) ServeHTTP(response http.ResponseWriter, request *http.Re
 	}
 
 	app.router.Lookup(request.Method, request.URL.Path, ctx)
-
 	if ctx.handler == nil {
 		response.WriteHeader(http.StatusNotFound)
 		ctx.Close()
@@ -245,7 +246,7 @@ func (app *Application) ServeHTTP(response http.ResponseWriter, request *http.Re
 	}
 
 	err := ctx.handler(ctx)
-
+	// app.queryCache = nil
 	if err != nil {
 		for _, callback := range app.onError {
 			callback(ctx, err)

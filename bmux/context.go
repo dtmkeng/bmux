@@ -4,6 +4,7 @@ import (
 	stdcontext "context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -65,6 +66,7 @@ type Context interface {
 	// Status() int
 	String(string) error
 	// Text(string) error
+	Query(string) string
 }
 
 // context represents a request & response context.
@@ -80,6 +82,7 @@ type context struct {
 	paramCount    int
 	modifiers     [maxModifiers]Modifier
 	modifierCount int
+	queryCache    url.Values
 }
 
 func contextGet(r *http.Request, key interface{}) interface{} {
@@ -118,6 +121,43 @@ func (ctx *context) App() *Application {
 // Path returns the relative request path, e.g. /blog/post/123.
 func (ctx *context) Path() string {
 	return ctx.request.inner.URL.Path
+}
+
+// Query returns the keyed url query value if it exists,
+// otherwise it returns an empty string `("")`.
+// It is shortcut for `c.Request.URL.Query().Get(key)`
+//     GET /path?id=1234&name=Manu&value=
+// 	   c.Query("id") == "1234"
+// 	   c.Query("name") == "Manu"
+// 	   c.Query("value") == ""
+// 	   c.Query("wtf") == ""
+func (ctx *context) Query(key string) string {
+	value, _ := ctx.GetQuery(key)
+	return value
+}
+
+// GetQuery ...
+func (ctx *context) GetQuery(key string) (string, bool) {
+	if values, ok := ctx.GetQueryArray(key); ok {
+		return values[0], ok
+	}
+	return "", false
+}
+
+// GetQueryArray returns a slice of strings for a given query key, plus
+// a boolean value whether at least one value exists for the given key.
+func (ctx *context) GetQueryArray(key string) ([]string, bool) {
+	ctx.getQueryCache()
+	if values, ok := ctx.queryCache[key]; ok && len(values) > 0 {
+		return values, true
+	}
+	return []string{}, false
+}
+func (ctx *context) getQueryCache() {
+	if ctx.queryCache == nil {
+		ctx.queryCache = make(url.Values)
+		ctx.queryCache, _ = url.ParseQuery(ctx.request.inner.URL.RawQuery)
+	}
 }
 
 // SetPath sets the relative request path, e.g. /blog/post/123.
