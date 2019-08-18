@@ -44,7 +44,7 @@ type Application struct {
 	// Security              ApplicationSecurity
 	// Linters               []Linter
 	// ContentSecurityPolicy *csp.ContentSecurityPolicy
-	context
+	// context
 	router     Routers
 	routeTests map[string][]string
 	start      time.Time
