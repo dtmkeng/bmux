@@ -23,6 +23,9 @@ func main() {
 	r.Get("/", func(ctx bmux.Context) error {
 		return ctx.String("hello")
 	})
+	r.Get("/hello", func(ctx bmux.Context) error {
+		return ctx.String(ctx.Query("name"))
+	})
 	// r.Run() http serer
 	fmt.Println("Server start at ... ", port)
 	// color.GreedString()
